@@ -100,8 +100,7 @@ function importCSV(e) {
         if (!personName) continue
         const rObj = {}
         headers.slice(1).forEach((h, idx) => {
-          const raw = parseInt(cols[idx + 1]) || 1
-          rObj[h] = raw - 1
+          rObj[h] = Math.min(4, Math.max(0, parseInt(cols[idx + 1]) || 0))
         })
         store.addRating({ name: personName, grams: store.globalGrams, ratings: rObj })
         count++
