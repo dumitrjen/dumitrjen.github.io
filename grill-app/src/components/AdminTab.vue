@@ -1,97 +1,127 @@
 <template>
   <div>
-    <!-- Global Portion -->
-    <div class="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-5 mb-6">
-      <h2 class="text-xl font-bold text-indigo-600 mb-3">⚖️ Portion für alle</h2>
-      <div class="flex gap-3 items-end">
-        <div class="flex-1">
-          <label class="block text-sm font-bold text-gray-500 mb-1">Gramm pro Person (gilt für alle)</label>
-          <input v-model.number="store.globalGrams" type="number" min="0" placeholder="z.B. 400"
-            class="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-indigo-500 outline-none"/>
+    <div class="section-card ember-card">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">Grundlage</p>
+          <h2>Portion festlegen</h2>
         </div>
-        <div class="text-indigo-400 text-sm pb-3">
-          {{ store.globalGrams ? store.globalGrams + 'g pro Person' : 'Noch nicht gesetzt' }}
+        <p>Diese Menge gilt für jeden Gast.</p>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Gramm pro Person</label>
+          <input v-model.number="store.globalGrams" type="number" min="0" placeholder="z. B. 400">
+        </div>
+        <div class="status-note">
+          {{ store.globalGrams ? store.globalGrams + ' g pro Person' : 'Noch nicht festgelegt' }}
         </div>
       </div>
     </div>
 
-    <!-- Produkte CSV Import -->
-    <div class="bg-green-50 border-2 border-green-200 rounded-xl p-5 mb-6">
-      <h2 class="text-xl font-bold text-green-600 mb-2">📥 Produkte aus CSV importieren</h2>
-      <p class="text-sm text-gray-500 mb-3">
-        Format: <code class="bg-gray-100 px-1 rounded">Name,Kategorie,Preis,GrammProPackung</code> — erste Zeile = Header
-      </p>
-      <input type="file" accept=".csv" @change="importProducts"
-        class="w-full border-2 border-dashed border-green-300 rounded-xl p-3 cursor-pointer bg-white"/>
-      <p v-if="csvMsg" class="mt-2 text-sm font-bold" :class="csvOk ? 'text-green-600' : 'text-red-500'">
-        {{ csvMsg }}
-      </p>
-    </div>
-
-    <!-- Produkt hinzufügen -->
-    <div class="bg-gray-50 rounded-xl p-5 mb-6">
-      <h2 class="text-xl font-bold text-indigo-600 mb-4">Produkt hinzufügen</h2>
-      <div class="grid grid-cols-2 gap-3">
+    <div class="section-card green-card">
+      <div class="section-heading">
         <div>
-          <label class="block text-sm font-bold text-gray-500 mb-1">Name</label>
-          <input v-model="form.name" placeholder="z.B. Bratwurst"
-            class="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-indigo-500 outline-none"/>
-        </div>
-        <div>
-          <label class="block text-sm font-bold text-gray-500 mb-1">Kategorie</label>
-          <input v-model="form.cat" placeholder="z.B. Fleisch"
-            class="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-indigo-500 outline-none"/>
-        </div>
-        <div>
-          <label class="block text-sm font-bold text-gray-500 mb-1">Preis pro Packung (€)</label>
-          <input v-model.number="form.price" type="number" step="0.01" min="0" placeholder="4.99"
-            class="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-indigo-500 outline-none"/>
-        </div>
-        <div>
-          <label class="block text-sm font-bold text-gray-500 mb-1">Gramm pro Packung</label>
-          <input v-model.number="form.packGrams" type="number" min="1" placeholder="z.B. 200"
-            class="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-indigo-500 outline-none"/>
+          <p class="section-kicker">Schneller Start</p>
+          <h2>Produkte importieren</h2>
         </div>
       </div>
-      <button @click="addProduct"
-        class="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-all">
-        + Produkt hinzufügen
-      </button>
+      <p class="helper-text">Die Produktnamen werden später exakt diesen Umfragespalten zugeordnet.</p>
+      <div class="csv-preview">
+        <div class="csv-preview-title">
+          <strong>So muss die Produkt-CSV aussehen</strong>
+          <span>Komma oder Semikolon sind erlaubt</span>
+        </div>
+        <div class="csv-table-wrap">
+          <table class="csv-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Kategorie</th>
+                <th>Preis</th>
+                <th>GrammProPackung</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Bratwurst</td>
+                <td>Fleisch</td>
+                <td>4.99</td>
+                <td>400</td>
+              </tr>
+              <tr>
+                <td>Grillkäse</td>
+                <td>Vegetarisch</td>
+                <td>3.49</td>
+                <td>200</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p><strong>Name</strong> muss eindeutig sein. Preis = Packungspreis, GrammProPackung = Packungsinhalt.</p>
+      </div>
+      <input type="file" accept=".csv" @change="importProducts" class="file-input">
+      <p v-if="csvMsg" class="feedback" :class="csvOk ? 'success' : 'error'">{{ csvMsg }}</p>
     </div>
 
-    <!-- Produktliste -->
-    <div class="bg-gray-50 rounded-xl p-5 mb-6">
-      <h2 class="text-xl font-bold text-indigo-600 mb-4">
-        Produkte
-        <span class="bg-indigo-600 text-white text-sm px-3 py-1 rounded-full ml-2">{{ store.products.length }}</span>
-      </h2>
-      <p v-if="!store.products.length" class="text-gray-400">Noch keine Produkte angelegt.</p>
-      <div v-for="(p, i) in store.products" :key="i"
-        class="bg-white border-l-4 border-indigo-500 rounded-xl p-4 mb-3 flex justify-between items-center">
+    <div class="section-card">
+      <div class="section-heading">
         <div>
-          <span class="font-bold text-gray-700">{{ p.name }}</span>
-          <span class="bg-indigo-100 text-indigo-600 text-xs px-2 py-1 rounded-full ml-2">{{ p.cat || 'keine Kat.' }}</span>
-          <p class="text-sm text-gray-400 mt-1">
-            €{{ Number(p.price).toFixed(2) }}/Stück · {{ p.packGrams || 100 }}g/Stück
-          </p>
+          <p class="section-kicker">Sortiment</p>
+          <h2>Produkt hinzufügen</h2>
         </div>
-        <button @click="store.deleteProduct(i)"
-          class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl font-bold">✕</button>
+      </div>
+      <div class="field-grid">
+        <div class="field">
+          <label>Name</label>
+          <input v-model="form.name" placeholder="z. B. Bratwurst">
+        </div>
+        <div class="field">
+          <label>Kategorie</label>
+          <input v-model="form.cat" placeholder="z. B. Fleisch">
+        </div>
+        <div class="field">
+          <label>Preis pro Packung (€)</label>
+          <input v-model.number="form.price" type="number" step="0.01" min="0" placeholder="4.99">
+        </div>
+        <div class="field">
+          <label>Gramm pro Packung</label>
+          <input v-model.number="form.packGrams" type="number" min="1" placeholder="z. B. 200">
+        </div>
+      </div>
+      <button @click="addProduct" class="button button-primary button-block">Produkt hinzufügen</button>
+    </div>
+
+    <div class="section-card">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">Aktuelle Auswahl</p>
+          <h2>Produkte <span class="count-badge">{{ store.products.length }}</span></h2>
+        </div>
+      </div>
+      <div v-if="!store.products.length" class="empty-state">Noch keine Produkte angelegt.</div>
+      <div v-else class="item-list">
+        <div v-for="(p, i) in store.products" :key="i" class="list-item">
+          <div>
+            <strong>{{ p.name }}</strong>
+            <span class="category-tag">{{ p.cat || 'Ohne Kategorie' }}</span>
+            <p class="item-meta">€{{ Number(p.price).toFixed(2) }} / Packung · {{ p.packGrams || 100 }} g</p>
+          </div>
+          <button @click="store.deleteProduct(i)" class="button button-danger" :aria-label="`${p.name} löschen`">Löschen</button>
+        </div>
       </div>
     </div>
 
-    <!-- Reset -->
-    <div class="bg-gray-50 rounded-xl p-5">
-      <h2 class="text-xl font-bold text-indigo-600 mb-4">Zurücksetzen</h2>
-      <div class="grid grid-cols-2 gap-3">
-        <button @click="resetRatings"
-          class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl">
-          Nur Bewertungen löschen
-        </button>
-        <button @click="resetAll"
-          class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl">
-          Alles löschen
-        </button>
+    <div class="section-card">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">Aufräumen</p>
+          <h2>Daten zurücksetzen</h2>
+        </div>
+      </div>
+      <div class="button-grid">
+        <button @click="resetRatings" class="button button-muted">Nur Bewertungen löschen</button>
+        <button @click="resetAll" class="button button-danger">Alle Daten löschen</button>
       </div>
     </div>
   </div>
@@ -100,9 +130,10 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { store } from '../stores/grillStore.js'
+import { normalizeHeader, parseCSV } from '../utils/csv.js'
 
 const csvMsg = ref('')
-const csvOk  = ref(false)
+const csvOk = ref(false)
 const form = reactive({ name: '', cat: '', price: 0, packGrams: 100 })
 
 function addProduct() {
@@ -122,23 +153,36 @@ function importProducts(e) {
   const reader = new FileReader()
   reader.onload = (ev) => {
     try {
-      const lines = ev.target.result.trim().split('\n')
+      const rows = parseCSV(ev.target.result)
+      if (rows.length < 2) throw new Error('Keine Produktdaten gefunden.')
+
+      const headers = rows[0].map(normalizeHeader)
+      const columns = {
+        name: headers.indexOf('name'),
+        cat: headers.indexOf('kategorie'),
+        price: headers.indexOf('preis'),
+        packGrams: headers.indexOf('grammpropackung')
+      }
+      if (Object.values(columns).some(index => index < 0)) {
+        throw new Error('Kopfzeile muss Name, Kategorie, Preis und GrammProPackung enthalten.')
+      }
+
       let count = 0
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''))
-        if (!cols[0]) continue
+      for (const cols of rows.slice(1)) {
+        if (!cols[columns.name]) continue
         store.addProduct({
-          name:     cols[0],
-          cat:      cols[1] || '',
-          price:    Number(cols[2]?.replace(',', '.')) || 0,
-          packGrams: Number(cols[3]) || 100
+          name: cols[columns.name].trim(),
+          cat: cols[columns.cat]?.trim() || '',
+          price: Number(cols[columns.price]?.replace(',', '.')) || 0,
+          packGrams: Number(cols[columns.packGrams]) || 100
         })
         count++
       }
-      csvMsg.value = `✅ ${count} Produkte importiert!`
+      if (!count) throw new Error('Keine gültigen Produktzeilen gefunden.')
+      csvMsg.value = `${count} Produkte importiert.`
       csvOk.value = true
-    } catch {
-      csvMsg.value = '❌ Fehler beim Lesen der CSV!'
+    } catch (error) {
+      csvMsg.value = error.message || 'Fehler beim Lesen der CSV-Datei.'
       csvOk.value = false
     }
   }

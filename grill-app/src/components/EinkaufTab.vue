@@ -1,36 +1,30 @@
 <template>
   <div>
-    <p v-if="!store.ratings.length" class="text-gray-400">Noch keine Bewertungen vorhanden.</p>
+    <div v-if="!store.ratings.length" class="empty-state">Noch keine Bewertungen vorhanden.</div>
 
     <div v-else>
-      <div v-for="p in totals" :key="p.name"
-        class="bg-gray-50 rounded-xl p-5 mb-4 border-l-4 border-green-500">
-        <div class="flex justify-between items-center">
+      <div v-for="p in totals" :key="p.name" class="shopping-card">
+        <div class="shopping-row">
           <div>
-            <span class="font-bold text-gray-700 text-lg">{{ p.name }}</span>
-            <span class="text-xs text-gray-400 ml-2">{{ p.cat }}</span>
-            <p class="text-sm text-gray-400 mt-1">{{ p.gramm }}g benötigt · {{ p.packGrams }}g/Stück</p>
+            <strong class="shopping-name">{{ p.name }}</strong>
+            <span class="category-tag">{{ p.cat || 'Ohne Kategorie' }}</span>
+            <p class="item-meta">{{ p.gramm }} g benötigt · {{ p.packGrams }} g je Packung</p>
           </div>
-          <div class="text-right">
-            <div class="text-3xl font-bold text-green-600">{{ p.packungen }} Stück</div>
-            <div class="text-sm font-bold text-indigo-600 mt-1">
-              €{{ Number(p.kosten).toFixed(2) }} gesamt
-            </div>
-            <div class="text-xs text-gray-400">
-              €{{ Number(p.price).toFixed(2) }}/Stück
-            </div>
+          <div class="shopping-total">
+            <strong>{{ p.packungen }} Packungen</strong>
+            <span>€{{ Number(p.kosten).toFixed(2) }} gesamt</span>
+            <p class="item-meta">€{{ Number(p.price).toFixed(2) }} / Packung</p>
           </div>
         </div>
       </div>
 
-      <!-- Gesamtpreis -->
-      <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl p-5 mt-4">
-        <div class="flex justify-between items-center">
-          <div>
-            <div class="text-lg font-bold">💰 Gesamtkosten</div>
-            <div class="text-indigo-200 text-sm">{{ store.ratings.length }} Personen</div>
+      <div class="grand-total">
+        <div class="total-row">
+          <div class="label">
+            Gesamtkosten
+            <span class="subline">{{ store.ratings.length }} Personen eingeplant</span>
           </div>
-          <div class="text-3xl font-bold">€{{ gesamtpreis }}</div>
+          <div class="price">€{{ gesamtpreis }}</div>
         </div>
       </div>
     </div>
