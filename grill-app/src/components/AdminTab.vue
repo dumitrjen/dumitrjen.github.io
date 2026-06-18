@@ -48,6 +48,11 @@
             class="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-indigo-500 outline-none"/>
         </div>
       </div>
+      <div>
+      <label class="block text-sm font-bold text-gray-500 mb-1">Gramm pro Packung</label>
+      <input v-model.number="form.packGrams" type="number" min="1" placeholder="z.B. 200"
+        class="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-indigo-500 outline-none"/>
+    </div>
       <button @click="addProduct"
         class="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-all">
         + Produkt hinzufügen
@@ -125,16 +130,17 @@ function importProducts(e) {
 }
 
 
-const form = reactive({ name: '', cat: '', price: 0 })
+const form = reactive({ name: '', cat: '', price: 0, packGrams: 100 })
 
 function addProduct() {
   if (!form.name.trim()) return alert('Bitte Produktname eingeben!')
   store.addProduct({ 
-    name: form.name.trim(), 
-    cat: form.cat.trim(), 
-    price: Number(form.price) || 0  // fix: immer Number
+  name: form.name.trim(), 
+  cat: form.cat.trim(), 
+  price: Number(form.price) || 0,
+  packGrams: Number(form.packGrams) || 100  // default 100g
   })
-  form.name = ''; form.cat = ''; form.price = 0
+  form.name = ''; form.cat = ''; form.price = 0; form.packGrams = 100
 }
 
 function resetRatings() {
