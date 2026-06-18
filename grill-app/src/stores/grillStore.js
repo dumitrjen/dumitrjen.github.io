@@ -17,6 +17,7 @@ export const store = reactive({
   calcDistribution(person) {
     const grams = this.globalGrams || person.grams || 0
     const active = this.products
+      .filter(p => !p.isExtra)
       .map(p => ({ name: p.name, r: person.ratings[p.name] || 0 }))
       .filter(x => x.r > 0)
     const total = active.reduce((s, x) => s + x.r, 0)
@@ -29,6 +30,15 @@ export const store = reactive({
       assigned += g
       return { name: x.name, rating: x.r, gramm: g }
     })
+  },
+
+  calcExtras(person) {
+    return this.products
+      .filter(p => p.isExtra && (person.ratings[p.name] || 0) > 0)
+      .map(p => ({
+        name: p.name,
+        rating: person.ratings[p.name]
+      }))
   }
 })
 

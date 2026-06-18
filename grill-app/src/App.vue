@@ -13,29 +13,36 @@
             <span class="grill-leg grill-leg-right" />
           </div>
           <div>
-            <p class="eyebrow">Grillabend planen</p>
-            <h1>Grill<span>Rechner</span></h1>
-            <p class="header-copy">Wünsche sammeln, Mengen berechnen, entspannt einkaufen.</p>
+            <p class="eyebrow">{{ t('planEvening') }}</p>
+            <h1 v-if="i18n.language === 'de'">Grill<span>Rechner</span></h1>
+            <h1 v-else>Grill<span>Calculator</span></h1>
+            <p class="header-copy">{{ t('tagline') }}</p>
           </div>
         </div>
 
-        <div class="header-stats" aria-label="Aktueller Planungsstand">
-          <div>
-            <strong>{{ store.products.length }}</strong>
-            <span>Produkte</span>
+        <div class="header-tools">
+          <div class="language-switch" :aria-label="t('language')">
+            <button :class="{ active: i18n.language === 'de' }" @click="i18n.language = 'de'">DE</button>
+            <button :class="{ active: i18n.language === 'en' }" @click="i18n.language = 'en'">EN</button>
           </div>
-          <div>
-            <strong>{{ store.ratings.length }}</strong>
-            <span>Gäste</span>
-          </div>
-          <div>
-            <strong>{{ store.globalGrams || '–' }}</strong>
-            <span>Gramm / Person</span>
+          <div class="header-stats">
+            <div>
+              <strong>{{ store.products.length }}</strong>
+              <span>{{ t('products') }}</span>
+            </div>
+            <div>
+              <strong>{{ store.ratings.length }}</strong>
+              <span>{{ t('guests') }}</span>
+            </div>
+            <div>
+              <strong>{{ store.globalGrams || '–' }}</strong>
+              <span>{{ t('gramsPerson') }}</span>
+            </div>
           </div>
         </div>
       </header>
 
-      <nav class="tab-bar" aria-label="Bereiche">
+      <nav class="tab-bar" :aria-label="pick('Bereiche', 'Sections')">
         <button
           v-for="(tab, index) in tabs"
           :key="tab.id"
@@ -58,18 +65,19 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import AdminTab from './components/AdminTab.vue'
 import UmfrageTab from './components/UmfrageTab.vue'
 import ErgebnisTab from './components/ErgebnisTab.vue'
 import EinkaufTab from './components/EinkaufTab.vue'
 import { store } from './stores/grillStore.js'
+import { i18n, pick, t } from './i18n.js'
 
 const activeTab = ref('admin')
-const tabs = [
-  { id: 'admin', label: 'Vorbereitung' },
-  { id: 'umfrage', label: 'Umfrage' },
-  { id: 'ergebnis', label: 'Ergebnisse' },
-  { id: 'einkauf', label: 'Einkauf' },
-]
+const tabs = computed(() => [
+  { id: 'admin', label: t('preparation') },
+  { id: 'umfrage', label: t('survey') },
+  { id: 'ergebnis', label: t('results') },
+  { id: 'einkauf', label: t('shopping') },
+])
 </script>
