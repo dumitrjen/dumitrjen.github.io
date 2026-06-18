@@ -48,6 +48,7 @@
 <script setup>
 import { store } from '../stores/grillStore.js'
 import { normalizeProductUrl, pick, t } from '../i18n.js'
+
 const dist = (person) => store.calcDistribution(person)
 const extras = (person) => store.calcExtras(person)
 const product = (name) => store.products.find(item => item.name === name)

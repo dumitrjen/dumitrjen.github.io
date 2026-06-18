@@ -1,17 +1,20 @@
 <template>
   <div>
-    <div class="section-card green-card">
+    <div class="section-card green-card" :class="{ collapsed: collapsed.csv }">
       <div class="section-heading">
         <div>
           <p class="section-kicker">{{ pick('Mehrere Gäste', 'Multiple guests') }}</p>
           <h2>{{ pick('Antworten importieren', 'Import responses') }}</h2>
         </div>
+        <button @click="toggleSection('csv')" class="collapse-button" :aria-expanded="!collapsed.csv">
+          {{ collapsed.csv ? pick('Anzeigen', 'Show') : pick('Ausblenden', 'Hide') }}
+        </button>
       </div>
       <p class="helper-text">{{ pick('Die Exportdatei aus der Umfrage wird anhand der Spaltenüberschriften zugeordnet.', 'Survey exports are matched using their column headers.') }}</p>
       <div class="csv-preview">
         <div class="csv-preview-title">
           <strong>{{ pick('So muss die Umfrage-CSV aussehen', 'Required survey CSV format') }}</strong>
-          <span>{{ pick('Bewertungen von 1 bis 4 Sternen', 'Ratings from 1 to 4 stars') }}</span>
+          <span>{{ pick('1 = kein Interesse · 2–4 = Interesse', '1 = not interested · 2–4 = interested') }}</span>
         </div>
         <div class="csv-table-wrap">
           <table class="csv-table survey-csv-table">
@@ -48,13 +51,18 @@
       <p v-if="csvMsg" class="feedback" :class="csvOk ? 'success' : 'error'">{{ csvMsg }}</p>
     </div>
 
-    <div class="section-card">
+    <div class="section-card" :class="{ collapsed: collapsed.manual }">
       <div class="section-heading">
         <div>
           <p class="section-kicker">{{ pick('Einzelne Antwort', 'Single response') }}</p>
           <h2>{{ pick('Wünsche eintragen', 'Enter preferences') }}</h2>
         </div>
-        <p>{{ store.globalGrams }} g {{ pick('Gesamtportion', 'total portion') }}</p>
+        <div class="section-heading-actions">
+          <p>{{ store.globalGrams }} g {{ pick('Gesamtportion', 'total portion') }}</p>
+          <button @click="toggleSection('manual')" class="collapse-button" :aria-expanded="!collapsed.manual">
+            {{ collapsed.manual ? pick('Anzeigen', 'Show') : pick('Ausblenden', 'Hide') }}
+          </button>
+        </div>
       </div>
 
       <div class="field" style="margin-bottom: 20px">
@@ -105,14 +113,14 @@
         </div>
         <div class="rating-options">
           <button
-            v-for="s in [0, 1, 2, 3, 4]"
+            v-for="s in [1, 2, 3, 4]"
             :key="s"
             @click="tempRatings[p.name] = s"
             class="rating-option"
-            :class="{ active: (tempRatings[p.name] || 0) === s, zero: s === 0 }"
+            :class="{ active: (tempRatings[p.name] || 0) === s, zero: s === 1 }"
             :aria-label="`${p.name}: ${labels[s]}`"
           >
-            {{ s === 0 ? pick('Nein', 'No') : s }}
+            {{ s }}
           </button>
         </div>
       </div>
@@ -126,19 +134,20 @@
 import { computed, ref, reactive } from 'vue'
 import { store } from '../stores/grillStore.js'
 import { normalizeHeader, parseCSV } from '../utils/csv.js'
-import { categoryLabel } from '../constants/products.js'
+import { categoryLabel, productIsExtra } from '../constants/products.js'
 import { i18n, normalizeProductUrl, pick, t } from '../i18n.js'
 
 const name = ref('')
 const labels = computed(() => i18n.language === 'en'
-  ? ['not at all', 'barely', 'like it', 'really like it', 'must have']
-  : ['gar nicht', 'kaum', 'gerne', 'sehr gerne', 'unbedingt'])
+  ? ['not rated', 'do not want', 'rather not', 'would like', 'must have']
+  : ['nicht bewertet', 'will ich nicht', 'eher nicht', 'gerne', 'unbedingt'])
 const tempRatings = reactive({})
 const csvMsg = ref('')
 const csvOk = ref(false)
 const search = ref('')
 const categoryFilter = ref('')
 const typeFilter = ref('')
+const collapsed = reactive(loadCollapsedSections())
 
 const usedCategories = computed(() =>
   [...new Set(store.products.map(product => product.cat).filter(Boolean))].sort()
@@ -146,21 +155,23 @@ const usedCategories = computed(() =>
 
 const filteredProducts = computed(() => {
   const query = search.value.trim().toLocaleLowerCase('de-DE')
-  return store.products.filter(product =>
-    (!query || product.name.toLocaleLowerCase('de-DE').includes(query))
-    && (!categoryFilter.value || product.cat === categoryFilter.value)
-    && (!typeFilter.value
-      || (typeFilter.value === 'extra' ? product.isExtra : !product.isExtra))
-  )
+  return store.products
+    .map(product => ({ ...product, isExtra: productIsExtra(product) }))
+    .filter(product =>
+      (!query || product.name.toLocaleLowerCase('de-DE').includes(query))
+      && (!categoryFilter.value || product.cat === categoryFilter.value)
+      && (!typeFilter.value
+        || (typeFilter.value === 'extra' ? product.isExtra : !product.isExtra))
+    )
 })
 
 function submit() {
   if (!name.value.trim()) return alert(pick('Bitte Namen eingeben!', 'Please enter a name.'))
-  if (!store.globalGrams && store.products.some(product => !product.isExtra)) {
+  if (!store.globalGrams && store.products.some(product => !productIsExtra(product))) {
     return alert(pick('Bitte zuerst Gramm pro Person unter Vorbereitung einstellen!', 'Set grams per person under Setup first.'))
   }
   const rObj = {}
-  store.products.forEach(p => { rObj[p.name] = tempRatings[p.name] || 0 })
+  store.products.forEach(p => { rObj[p.name] = tempRatings[p.name] || 1 })
   const existing = store.ratings.findIndex(r => r.name === name.value.trim())
   if (existing >= 0 && !confirm(pick(
     name.value + ' hat schon abgestimmt. Überschreiben?',
@@ -178,7 +189,7 @@ function importCSV(e) {
   const reader = new FileReader()
   reader.onload = (ev) => {
     try {
-      if (!store.globalGrams && store.products.some(product => !product.isExtra)) {
+      if (!store.globalGrams && store.products.some(product => !productIsExtra(product))) {
         throw new Error(pick('Bitte zuerst die Gramm pro Person unter „Vorbereitung“ festlegen.', 'Set grams per person under “Setup” first.'))
       }
       if (!store.products.length) {
@@ -255,5 +266,19 @@ function isIgnoredSurveyColumn(header) {
   return compact === 'zeitstempel'
     || compact === 'timestamp'
     || compact === 'bigback'
+}
+
+function toggleSection(section) {
+  collapsed[section] = !collapsed[section]
+  localStorage.setItem('grill_survey_collapsed', JSON.stringify(collapsed))
+}
+
+function loadCollapsedSections() {
+  const defaults = { csv: true, manual: false }
+  try {
+    return { ...defaults, ...JSON.parse(localStorage.getItem('grill_survey_collapsed') || '{}') }
+  } catch {
+    return defaults
+  }
 }
 </script>
