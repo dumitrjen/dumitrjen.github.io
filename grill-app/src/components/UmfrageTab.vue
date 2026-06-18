@@ -41,7 +41,7 @@
           </span>
         </div>
         <div class="flex gap-2">
-          <div v-for="s in [0,1,2,3,4]" :key="s" class="text-center">
+          <div v-for="s in [0,1,2,3]" :key="s" class="text-center">
             <button @click="tempRatings[p.name] = s"
               :class="(tempRatings[p.name] || 0) === s
                 ? s === 0 ? 'bg-red-500 border-red-500 text-white' : 'bg-indigo-600 border-indigo-600 text-white'
@@ -67,7 +67,7 @@ import { ref, reactive } from 'vue'
 import { store } from '../stores/grillStore.js'
 
 const name  = ref('')
-const labels = ['gar nicht', 'wenig', 'mittel', 'gerne', 'unbedingt!']
+const labels = ['gar nicht', 'wenig', 'gerne', 'unbedingt!']
 const tempRatings = reactive({})
 const csvMsg = ref(''); const csvOk = ref(false)
 
@@ -100,7 +100,7 @@ function importCSV(e) {
         if (!personName) continue
         const rObj = {}
         headers.slice(1).forEach((h, idx) => {
-          rObj[h] = Math.min(4, Math.max(0, parseInt(cols[idx + 1]) || 0))
+          rObj[h] = Math.min(3, Math.max(0, parseInt(cols[idx + 1]) || 0))
         })
         store.addRating({ name: personName, grams: store.globalGrams, ratings: rObj })
         count++

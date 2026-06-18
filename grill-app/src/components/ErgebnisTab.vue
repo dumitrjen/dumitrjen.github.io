@@ -20,7 +20,7 @@
         <div class="flex justify-between text-sm mb-1">
           <span class="font-bold text-gray-600">{{ d.name }}</span>
           <div class="flex items-center gap-3">
-            <span class="text-yellow-500">{{ '★'.repeat(d.rating) }}{{ '☆'.repeat(4 - d.rating) }}</span>
+            <span class="text-yellow-500">{{ '★'.repeat(d.rating) }}{{ '☆'.repeat(3 - d.rating) }}</span>
             <span class="font-bold text-indigo-600">{{ d.gramm }}g</span>
             <span class="text-gray-400">{{ Math.round(d.gramm / store.globalGrams * 100) }}%</span>
           </div>
