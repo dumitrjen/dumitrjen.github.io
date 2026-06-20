@@ -54,6 +54,47 @@
         </button>
       </nav>
 
+      <section class="online-panel">
+        <div>
+          <p class="section-kicker">{{ pick('Online speichern', 'Online sync') }}</p>
+          <strong>{{ store.onlineEventId ? store.onlineEventName || store.onlineEventId : pick('Lokale Session', 'Local session') }}</strong>
+          <span v-if="!store.supabaseConfigured">{{ pick('Supabase-Keys fehlen. Die App läuft lokal weiter.', 'Supabase keys are missing. The app keeps working locally.') }}</span>
+          <span v-else-if="store.onlineMessage" :class="{ error: store.onlineStatus === 'error' }">{{ store.onlineMessage }}</span>
+          <span v-else>{{ pick('Erstelle ein Online-Event oder lade eins per Link.', 'Create an online event or load one by link.') }}</span>
+        </div>
+        <div class="online-actions">
+          <input
+            v-model="store.onlineEventName"
+            :placeholder="pick('Eventname', 'Event name')"
+            :disabled="store.onlineBusy || !store.supabaseConfigured"
+          >
+          <button
+            v-if="!store.onlineEventId"
+            @click="store.createOnlineEvent()"
+            class="button button-primary"
+            :disabled="store.onlineBusy || !store.supabaseConfigured"
+          >
+            {{ store.onlineBusy ? pick('Speichert …', 'Saving …') : pick('Online-Event erstellen', 'Create online event') }}
+          </button>
+          <button
+            v-else
+            @click="store.saveOnlineEvent()"
+            class="button button-primary"
+            :disabled="store.onlineBusy || !store.supabaseConfigured"
+          >
+            {{ store.onlineBusy ? pick('Speichert …', 'Saving …') : pick('Online speichern', 'Save online') }}
+          </button>
+          <button
+            v-if="store.onlineEventId"
+            @click="store.copyEventLink()"
+            class="button button-quiet"
+            :disabled="store.onlineBusy"
+          >
+            {{ pick('Link kopieren', 'Copy link') }}
+          </button>
+        </div>
+      </section>
+
       <section class="content-panel">
         <AdminTab v-if="activeTab === 'admin'" />
         <UmfrageTab v-if="activeTab === 'umfrage'" />
@@ -65,7 +106,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import AdminTab from './components/AdminTab.vue'
 import UmfrageTab from './components/UmfrageTab.vue'
 import ErgebnisTab from './components/ErgebnisTab.vue'
@@ -80,4 +121,8 @@ const tabs = computed(() => [
   { id: 'ergebnis', label: t('results') },
   { id: 'einkauf', label: t('shopping') },
 ])
+
+onMounted(() => {
+  store.loadEventFromUrl()
+})
 </script>

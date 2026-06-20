@@ -14,16 +14,70 @@
         </div>
       </div>
 
-      <template v-if="page === 1">
-        <div v-if="!calculatedProducts.length" class="empty-state">{{ pick('Noch keine berechneten Hauptprodukte.', 'No calculated main products yet.') }}</div>
+      <div class="shopping-overview">
+        <div>
+          <span>{{ pick('Gäste', 'Guests') }}</span>
+          <strong>{{ store.ratings.length }}</strong>
+        </div>
+        <div>
+          <span>{{ pick('Fleisch', 'Meat') }}</span>
+          <strong>{{ categoryGrams('Fleisch') }} g</strong>
+        </div>
+        <div>
+          <span>Veggie</span>
+          <strong>{{ categoryGrams('Veggie') }} g</strong>
+        </div>
+        <div>
+          <span>{{ pick('Extras gewählt', 'Extras selected') }}</span>
+          <strong>{{ selectedTemporaryCount }}</strong>
+        </div>
+        <div>
+          <span>{{ pick('Kosten pro Person', 'Cost per person') }}</span>
+          <strong>€{{ costPerPerson.toFixed(2) }}</strong>
+        </div>
+      </div>
 
-        <div v-for="p in calculatedProducts" :key="p.name" class="shopping-card">
+      <div v-if="shoppingChecks.length" class="shopping-checks">
+        <div v-for="check in shoppingChecks" :key="check" class="status-chip warning">{{ check }}</div>
+      </div>
+
+      <div class="filter-bar shopping-filter-bar">
+        <div class="field search-field">
+          <label>{{ pick('Einkauf suchen', 'Search shopping list') }}</label>
+          <input v-model="shoppingSearch" type="search" :placeholder="pick('Produkt suchen …', 'Search product …')">
+        </div>
+        <div class="field">
+          <label>{{ pick('Sortieren', 'Sort') }}</label>
+          <select v-model="shoppingSort">
+            <option value="name">{{ pick('Name', 'Name') }}</option>
+            <option value="cost">{{ pick('Teuerste zuerst', 'Highest cost first') }}</option>
+            <option value="demand">{{ pick('Höchste Nachfrage zuerst', 'Highest demand first') }}</option>
+          </select>
+        </div>
+      </div>
+
+      <template v-if="page === 1">
+        <div v-if="!visibleCalculatedProducts.length" class="empty-state">{{ pick('Keine passenden berechneten Produkte.', 'No matching calculated products.') }}</div>
+
+        <div v-for="p in visibleCalculatedProducts" :key="p.name" class="shopping-card">
           <div class="shopping-row">
             <div>
               <strong class="shopping-name">{{ p.name }}</strong>
               <span class="category-tag">{{ categoryLabel(p.cat, i18n.language) }}</span>
+              <span class="status-chip" :class="{ warning: !p.price || !p.link }">
+                {{ productStatus(p) }}
+              </span>
               <a v-if="p.link" class="product-link" :href="normalizeProductUrl(p.link)" target="_blank" rel="noopener noreferrer">{{ t('openLink') }}</a>
               <p class="item-meta">{{ pick(`${p.gramm} g benötigt · ${p.packGrams} g je Packung`, `${p.gramm} g required · ${p.packGrams} g per package`) }}</p>
+              <details class="calc-details">
+                <summary>{{ pick('So wurde gerechnet', 'How this was calculated') }}</summary>
+                <p>
+                  {{ pick(
+                    `${p.gramm} g Bedarf ÷ ${p.packGrams} g pro Packung = ${p.rawPackages.toFixed(2)} → ${p.packungen} Packungen.`,
+                    `${p.gramm} g required ÷ ${p.packGrams} g per package = ${p.rawPackages.toFixed(2)} → ${p.packungen} packages.`
+                  ) }}
+                </p>
+              </details>
             </div>
             <div class="shopping-total">
               <strong>{{ p.packungen }} {{ t('packages') }}</strong>
@@ -50,7 +104,7 @@
           <div v-if="!sideStats.length" class="empty-state">{{ pick('Keine Sides vorhanden.', 'No sides available.') }}</div>
           <div v-else class="drink-check-list">
             <QuantityRow
-              v-for="item in sideStats"
+              v-for="item in visibleSideStats"
               :key="item.name"
               :item="item"
               v-model="temporaryPackages[item.name]"
@@ -68,7 +122,7 @@
           <div v-if="!drinkStats.length" class="empty-state">{{ pick('Keine Getränke vorhanden.', 'No drinks available.') }}</div>
           <div v-else class="drink-check-list">
             <QuantityRow
-              v-for="item in drinkStats"
+              v-for="item in visibleDrinkStats"
               :key="item.name"
               :item="item"
               v-model="temporaryPackages[item.name]"
@@ -103,6 +157,8 @@ import { i18n, normalizeProductUrl, pick, t } from '../i18n.js'
 
 const page = ref(1)
 const temporaryPackages = reactive({})
+const shoppingSearch = ref('')
+const shoppingSort = ref('name')
 
 const calculatedProducts = computed(() => {
   const map = {}
@@ -126,6 +182,7 @@ const calculatedProducts = computed(() => {
   return Object.values(map)
     .map(product => {
       product.packungen = Math.ceil(product.gramm / product.packGrams)
+      product.rawPackages = product.gramm / product.packGrams
       product.kosten = product.packungen * product.price
       return product
     })
@@ -135,6 +192,9 @@ const calculatedProducts = computed(() => {
 const sideStats = computed(() => demandStats('Sides'))
 const drinkStats = computed(() => demandStats('Getränke'))
 const temporaryItems = computed(() => [...sideStats.value, ...drinkStats.value])
+const visibleCalculatedProducts = computed(() => sortItems(filterBySearch(calculatedProducts.value), 'main'))
+const visibleSideStats = computed(() => sortItems(filterBySearch(sideStats.value), 'temporary'))
+const visibleDrinkStats = computed(() => sortItems(filterBySearch(drinkStats.value), 'temporary'))
 
 const calculatedTotal = computed(() =>
   calculatedProducts.value.reduce((sum, product) => sum + product.kosten, 0)
@@ -144,6 +204,24 @@ const temporaryTotal = computed(() =>
     sum + Math.max(0, Number(temporaryPackages[item.name]) || 0) * item.price, 0)
 )
 const grandTotal = computed(() => calculatedTotal.value + temporaryTotal.value)
+const selectedTemporaryCount = computed(() =>
+  temporaryItems.value.filter(item => Number(temporaryPackages[item.name]) > 0).length
+)
+const costPerPerson = computed(() =>
+  store.ratings.length ? grandTotal.value / store.ratings.length : 0
+)
+const shoppingChecks = computed(() => {
+  const checks = []
+  if (drinkStats.value.length && !drinkStats.value.some(item => Number(temporaryPackages[item.name]) > 0)) {
+    checks.push(pick('0 Getränke-Packungen gesetzt', '0 drink packages set'))
+  }
+  const missingPrices = store.products.filter(product => !Number(product.price)).length
+  if (missingPrices) checks.push(pick(`${missingPrices} Produkte ohne Preis`, `${missingPrices} products without price`))
+  const missingLinks = store.products.filter(product => !product.link).length
+  if (missingLinks) checks.push(pick(`${missingLinks} Produkte ohne Link`, `${missingLinks} products without link`))
+  if (selectedTemporaryCount.value) checks.push(pick(`${selectedTemporaryCount.value} temporäre Anpassungen`, `${selectedTemporaryCount.value} temporary changes`))
+  return checks
+})
 
 function demandStats(category) {
   return store.products
@@ -159,6 +237,38 @@ function demandStats(category) {
     })
 }
 
+function filterBySearch(items) {
+  const query = shoppingSearch.value.trim().toLocaleLowerCase('de-DE')
+  if (!query) return items
+  return items.filter(item => item.name.toLocaleLowerCase('de-DE').includes(query))
+}
+
+function sortItems(items, type) {
+  return [...items].sort((a, b) => {
+    if (shoppingSort.value === 'cost') {
+      const aCost = type === 'main' ? a.kosten : (Number(temporaryPackages[a.name]) || 0) * a.price
+      const bCost = type === 'main' ? b.kosten : (Number(temporaryPackages[b.name]) || 0) * b.price
+      return bCost - aCost || a.name.localeCompare(b.name)
+    }
+    if (shoppingSort.value === 'demand') {
+      return (b.interested || b.gramm || 0) - (a.interested || a.gramm || 0) || a.name.localeCompare(b.name)
+    }
+    return a.name.localeCompare(b.name)
+  })
+}
+
+function categoryGrams(category) {
+  return calculatedProducts.value
+    .filter(product => product.cat === category)
+    .reduce((sum, product) => sum + product.gramm, 0)
+}
+
+function productStatus(product) {
+  if (!product.price) return pick('Preis fehlt', 'Missing price')
+  if (!product.link) return pick('Link fehlt', 'Missing link')
+  return pick('Berechnet', 'Calculated')
+}
+
 const QuantityRow = defineComponent({
   props: {
     item: { type: Object, required: true },
@@ -166,22 +276,35 @@ const QuantityRow = defineComponent({
   },
   emits: ['update:modelValue'],
   setup(props, { emit }) {
+    const update = (next) => emit('update:modelValue', Math.max(0, Number(next) || 0))
     return () => h('div', { class: 'drink-check-row' }, [
       h('div', [
         h('strong', props.item.name),
-        h('p', `${props.item.interested} / ${store.ratings.length} ${pick('Personen interessiert', 'people interested')} · Ø ${props.item.average.toFixed(1)} ★`)
+        h('p', `${props.item.interested} / ${store.ratings.length} ${pick('Personen interessiert', 'people interested')} · Ø ${props.item.average.toFixed(1)} ★`),
+        h('span', {
+          class: ['status-chip', (props.modelValue || 0) ? 'manual' : '']
+        }, (props.modelValue || 0) ? pick('Temporär angepasst', 'Temporary override') : pick('Nicht im Einkauf', 'Not in shopping list'))
       ]),
       h('label', [
         h('span', t('packages')),
-        h('input', {
-          type: 'number',
-          min: 0,
-          step: 1,
-          value: props.modelValue || 0,
-          onInput: event => emit('update:modelValue', Math.max(0, Number(event.target.value) || 0))
-        })
+        h('div', { class: 'quantity-stepper' }, [
+          h('button', { type: 'button', onClick: () => update((props.modelValue || 0) - 1) }, '−'),
+          h('input', {
+            type: 'number',
+            min: 0,
+            step: 1,
+            value: props.modelValue || 0,
+            onInput: event => update(event.target.value)
+          }),
+          h('button', { type: 'button', onClick: () => update((props.modelValue || 0) + 1) }, '+')
+        ])
       ]),
-      h('div', { class: 'drink-line-price' }, `€${((props.modelValue || 0) * props.item.price).toFixed(2)}`)
+      h('div', { class: 'drink-line-price' }, [
+        h('span', { class: 'temporary-delta' }, (props.modelValue || 0)
+          ? `+${props.modelValue} ${t('packages')} · +€${((props.modelValue || 0) * props.item.price).toFixed(2)}`
+          : '+0'),
+        h('strong', `€${((props.modelValue || 0) * props.item.price).toFixed(2)}`)
+      ])
     ])
   }
 })
