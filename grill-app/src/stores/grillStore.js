@@ -1,6 +1,6 @@
 import { reactive, watch } from 'vue'
 import { normalizeCategory, productIsExtra, productKind } from '../constants/products.js'
-import { supabase, supabaseConfigured } from '../services/supabaseClient.js'
+import { supabase, supabaseConfigError, supabaseConfigured } from '../services/supabaseClient.js'
 
 const storage = typeof window !== 'undefined' ? window.localStorage : null
 const savedProducts = JSON.parse(storage?.getItem('grill_products') || '[]')
@@ -23,6 +23,7 @@ export const store = reactive({
   onlineMessage: '',
   onlineBusy: false,
   supabaseConfigured,
+  supabaseConfigError,
 
   addProduct(p)    { this.products.push(p) },
   deleteProduct(i) { this.products.splice(i, 1) },

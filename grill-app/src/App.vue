@@ -58,7 +58,8 @@
         <div>
           <p class="section-kicker">{{ pick('Online speichern', 'Online sync') }}</p>
           <strong>{{ store.onlineEventId ? store.onlineEventName || store.onlineEventId : pick('Lokale Session', 'Local session') }}</strong>
-          <span v-if="!store.supabaseConfigured">{{ pick('Supabase-Keys fehlen. Die App läuft lokal weiter.', 'Supabase keys are missing. The app keeps working locally.') }}</span>
+          <span v-if="store.supabaseConfigError" class="error">{{ pick('Falscher Supabase-Key: Bitte den anon public key verwenden, nicht den secret key.', 'Wrong Supabase key: use the anon public key, not the secret key.') }}</span>
+          <span v-else-if="!store.supabaseConfigured">{{ pick('Supabase-Keys fehlen. Die App läuft lokal weiter.', 'Supabase keys are missing. The app keeps working locally.') }}</span>
           <span v-else-if="store.onlineMessage" :class="{ error: store.onlineStatus === 'error' }">{{ store.onlineMessage }}</span>
           <span v-else>{{ pick('Erstelle ein Online-Event oder lade eins per Link.', 'Create an online event or load one by link.') }}</span>
         </div>
