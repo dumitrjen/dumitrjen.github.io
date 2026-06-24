@@ -137,8 +137,8 @@
             {{ pick('Gesamtkosten', 'Total cost') }}
             <span class="subline">
               {{ pick(
-                `Berechnet €${calculatedTotal.toFixed(2)} + temporär €${temporaryTotal.toFixed(2)}`,
-                `Calculated €${calculatedTotal.toFixed(2)} + temporary €${temporaryTotal.toFixed(2)}`
+                `Berechnet €${calculatedTotal.toFixed(2)} + temporär €${temporaryTotal.toFixed(2)} + manuell €${manualTotal.toFixed(2)}`,
+                `Calculated €${calculatedTotal.toFixed(2)} + temporary €${temporaryTotal.toFixed(2)} + manual €${manualTotal.toFixed(2)}`
               ) }}
             </span>
           </div>
@@ -175,21 +175,75 @@
           {{ pick('Noch keine Produkte mit Einkaufsmenge.', 'No products with shopping quantities yet.') }}
         </div>
         <p v-if="exportMessage" class="feedback success">{{ exportMessage }}</p>
-        <div v-if="finalShoppingItems.length" class="actual-shopping-list">
-          <label
-            v-for="item in finalShoppingItems"
-            :key="item.key"
-            class="actual-shopping-row"
-            :class="{ bought: boughtItems[item.key] }"
-          >
-            <input v-model="boughtItems[item.key]" type="checkbox">
-            <span class="actual-shopping-copy">
-              <strong>{{ item.name }}</strong>
-              <small>{{ categoryLabel(item.category, i18n.language) }} · {{ item.note }}</small>
-            </span>
-            <span class="actual-shopping-qty">{{ item.quantity }}</span>
-            <span class="actual-shopping-price">€{{ item.cost.toFixed(2) }}</span>
+
+        <div v-if="finalShoppingItems.length" class="shopping-mode-tools">
+          <div class="shopping-progress">
+            <div>
+              <span>{{ pick('Einkaufsfortschritt', 'Shopping progress') }}</span>
+              <strong>{{ boughtCount }} / {{ finalShoppingItems.length }} · €{{ grandTotal.toFixed(2) }}</strong>
+            </div>
+            <progress :value="boughtCount" :max="finalShoppingItems.length"></progress>
+          </div>
+          <label class="toggle-line">
+            <input v-model="hideBought" type="checkbox">
+            {{ pick('Gekaufte ausblenden', 'Hide bought items') }}
           </label>
+        </div>
+
+        <form class="manual-shopping-form" @submit.prevent="addManualShoppingItem">
+          <div class="field">
+            <label>{{ pick('Extra Item', 'Extra item') }}</label>
+            <input v-model="manualItem.name" type="text" :placeholder="pick('z.B. Kohle, Eis, Servietten', 'e.g. charcoal, ice, napkins')">
+          </div>
+          <div class="field">
+            <label>{{ pick('Menge', 'Quantity') }}</label>
+            <input v-model="manualItem.quantity" type="text" :placeholder="pick('z.B. 2 Packungen', 'e.g. 2 packages')">
+          </div>
+          <div class="field">
+            <label>{{ pick('Preis optional', 'Price optional') }}</label>
+            <input v-model.number="manualItem.cost" type="number" min="0" step="0.01" placeholder="0.00">
+          </div>
+          <button class="button button-quiet" type="submit">{{ pick('Hinzufügen', 'Add') }}</button>
+        </form>
+
+        <div v-if="finalShoppingItems.length && !visibleFinalShoppingGroups.length" class="empty-state">
+          {{ pick('Alles gekauft oder ausgeblendet.', 'Everything is bought or hidden.') }}
+        </div>
+        <div v-if="visibleFinalShoppingGroups.length" class="actual-shopping-list">
+          <details
+            v-for="[category, items] in visibleFinalShoppingGroups"
+            :key="category"
+            class="shopping-group"
+            :open="!collapsedGroups[category]"
+            @toggle="collapsedGroups[category] = !$event.target.open"
+          >
+            <summary>
+              <span>{{ categoryLabel(category, i18n.language) }}</span>
+              <small>{{ groupBoughtCount(items) }} / {{ items.length }}</small>
+            </summary>
+            <label
+              v-for="item in items"
+              :key="item.key"
+              class="actual-shopping-row"
+              :class="{ bought: boughtItems[item.key] }"
+            >
+              <input v-model="boughtItems[item.key]" type="checkbox">
+              <span class="actual-shopping-copy">
+                <strong>{{ item.name }}</strong>
+                <small>{{ categoryLabel(item.category, i18n.language) }} · {{ item.note }}</small>
+              </span>
+              <span class="actual-shopping-qty">{{ item.quantity }}</span>
+              <span class="actual-shopping-price">€{{ item.cost.toFixed(2) }}</span>
+              <button
+                v-if="item.manual"
+                type="button"
+                class="inline-danger"
+                @click.prevent="removeManualShoppingItem(item.id)"
+              >
+                {{ pick('Entfernen', 'Remove') }}
+              </button>
+            </label>
+          </details>
         </div>
       </div>
     </template>
@@ -205,9 +259,17 @@ import { i18n, normalizeProductUrl, pick, t } from '../i18n.js'
 const page = ref(1)
 const temporaryPackages = reactive({})
 const boughtItems = reactive({})
+const collapsedGroups = reactive({})
 const shoppingSearch = ref('')
 const shoppingSort = ref('name')
 const exportMessage = ref('')
+const hideBought = ref(false)
+const manualItems = ref([])
+const manualItem = reactive({
+  name: '',
+  quantity: '',
+  cost: 0
+})
 
 const calculatedProducts = computed(() => {
   const map = {}
@@ -252,7 +314,10 @@ const temporaryTotal = computed(() =>
   temporaryItems.value.reduce((sum, item) =>
     sum + Math.max(0, Number(temporaryPackages[item.name]) || 0) * item.price, 0)
 )
-const grandTotal = computed(() => calculatedTotal.value + temporaryTotal.value)
+const manualTotal = computed(() =>
+  manualItems.value.reduce((sum, item) => sum + Math.max(0, Number(item.cost) || 0), 0)
+)
+const grandTotal = computed(() => calculatedTotal.value + temporaryTotal.value + manualTotal.value)
 const finalShoppingItems = computed(() => {
   const calculated = calculatedProducts.value.map(product => ({
     key: `calc:${product.name}`,
@@ -279,8 +344,30 @@ const finalShoppingItems = computed(() => {
       }
     })
     .filter(item => item.packages > 0)
-  return [...calculated, ...temporary]
+  const manual = manualItems.value.map(item => ({
+    ...item,
+    key: `manual:${item.id}`,
+    category: 'Sonstiges',
+    source: pick('manuell', 'manual'),
+    note: pick('manuell hinzugefügt', 'manually added'),
+    manual: true
+  }))
+  return [...calculated, ...temporary, ...manual]
 })
+const visibleFinalShoppingGroups = computed(() => {
+  const visible = hideBought.value
+    ? finalShoppingItems.value.filter(item => !boughtItems[item.key])
+    : finalShoppingItems.value
+  const groups = visible.reduce((map, item) => {
+    if (!map[item.category]) map[item.category] = []
+    map[item.category].push(item)
+    return map
+  }, {})
+  return Object.entries(groups)
+})
+const boughtCount = computed(() =>
+  finalShoppingItems.value.filter(item => boughtItems[item.key]).length
+)
 const selectedTemporaryCount = computed(() =>
   temporaryItems.value.filter(item => Number(temporaryPackages[item.name]) > 0).length
 )
@@ -344,6 +431,31 @@ function productStatus(product) {
   if (!product.price) return pick('Preis fehlt', 'Missing price')
   if (!product.link) return pick('Link fehlt', 'Missing link')
   return pick('Berechnet', 'Calculated')
+}
+
+function addManualShoppingItem() {
+  const name = manualItem.name.trim()
+  if (!name) return
+  manualItems.value.push({
+    id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+    name,
+    quantity: manualItem.quantity.trim() || '1',
+    packages: '',
+    cost: Math.max(0, Number(manualItem.cost) || 0)
+  })
+  manualItem.name = ''
+  manualItem.quantity = ''
+  manualItem.cost = 0
+}
+
+function removeManualShoppingItem(id) {
+  const item = manualItems.value.find(entry => entry.id === id)
+  if (item) delete boughtItems[`manual:${item.id}`]
+  manualItems.value = manualItems.value.filter(entry => entry.id !== id)
+}
+
+function groupBoughtCount(items) {
+  return items.filter(item => boughtItems[item.key]).length
 }
 
 function exportShoppingList() {
