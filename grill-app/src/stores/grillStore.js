@@ -3,6 +3,9 @@ import { normalizeCategory, productIsExtra, productKind } from '../constants/pro
 import { supabase, supabaseConfigError, supabaseConfigured } from '../services/supabaseClient.js'
 
 const storage = typeof window !== 'undefined' ? window.localStorage : null
+const savedShoppingState = normalizeShoppingState(
+  JSON.parse(storage?.getItem('grill_shoppingState') || 'null')
+)
 const savedProducts = JSON.parse(storage?.getItem('grill_products') || '[]')
   .map(product => {
     const { kind, purchaseMode, amountPerPack, amountPerPerson, servingsPerPack, ...cleanProduct } = product
@@ -19,6 +22,7 @@ export const store = reactive({
   products: savedProducts,
   ratings: JSON.parse(storage?.getItem('grill_ratings') || '[]'),
   globalGrams: JSON.parse(storage?.getItem('grill_globalGrams') || '0'),
+  shoppingState: savedShoppingState,
   onlineEventId: storage?.getItem('grill_onlineEventId') || '',
   onlineEventName: storage?.getItem('grill_onlineEventName') || '',
   onlineStatus: supabaseConfigured ? 'ready' : 'not_configured',
@@ -42,6 +46,7 @@ export const store = reactive({
     this.products = []
     this.ratings = []
     this.globalGrams = 0
+    this.shoppingState = defaultShoppingState()
   },
 
   calcDistribution(person) {
@@ -87,7 +92,11 @@ export const store = reactive({
       const name = this.onlineEventName || `Grillabend ${new Date().toLocaleDateString('de-AT')}`
       const { data, error } = await supabase
         .from('events')
-        .insert({ name, global_grams: Number(this.globalGrams) || 0 })
+        .insert({
+          name,
+          global_grams: Number(this.globalGrams) || 0,
+          shopping_state: toDbShoppingState(this.shoppingState)
+        })
         .select('id, name, global_grams')
         .single()
       if (error) throw error
@@ -116,6 +125,7 @@ export const store = reactive({
         .update({
           name: this.onlineEventName || null,
           global_grams: Number(this.globalGrams) || 0,
+          shopping_state: toDbShoppingState(this.shoppingState),
           updated_at: new Date().toISOString()
         })
         .eq('id', this.onlineEventId)
@@ -138,7 +148,7 @@ export const store = reactive({
     try {
       const { data: event, error: eventError } = await supabase
         .from('events')
-        .select('id, name, global_grams')
+        .select('id, name, global_grams, shopping_state')
         .eq('id', id)
         .single()
       if (eventError) throw eventError
@@ -154,6 +164,7 @@ export const store = reactive({
       this.onlineEventId = event.id
       this.onlineEventName = event.name || ''
       this.globalGrams = Number(event.global_grams) || 0
+      this.shoppingState = normalizeShoppingState(event.shopping_state)
       this.products = (products || []).map(fromDbProduct)
       this.ratings = (ratings || []).map(fromDbRating)
       this.onlineDirty = false
@@ -231,6 +242,8 @@ watch(() => store.ratings, v => storage?.setItem('grill_ratings', JSON.stringify
 watch(() => store.ratings, () => store.markOnlineDirty(), { deep: true })
 watch(() => store.globalGrams, v => storage?.setItem('grill_globalGrams', JSON.stringify(v)))
 watch(() => store.globalGrams, () => store.markOnlineDirty())
+watch(() => store.shoppingState, v => storage?.setItem('grill_shoppingState', JSON.stringify(v)), { deep: true })
+watch(() => store.shoppingState, () => store.markOnlineDirty(), { deep: true })
 watch(() => store.onlineEventId, v => storage?.setItem('grill_onlineEventId', v || ''))
 watch(() => store.onlineEventName, v => storage?.setItem('grill_onlineEventName', v || ''))
 watch(() => store.onlineEventName, () => store.markOnlineDirty())
@@ -282,4 +295,49 @@ function fromDbRating(rating) {
     grams: Number(rating.grams) || 0,
     ratings: rating.ratings || {}
   }
+}
+
+function defaultShoppingState() {
+  return {
+    temporaryPackages: {},
+    boughtItems: {},
+    collapsedGroups: {},
+    hideBought: false,
+    manualItems: []
+  }
+}
+
+function normalizeShoppingState(value) {
+  const fallback = defaultShoppingState()
+  if (!value || typeof value !== 'object') return fallback
+  return {
+    temporaryPackages: plainObject(value.temporaryPackages),
+    boughtItems: plainObject(value.boughtItems),
+    collapsedGroups: plainObject(value.collapsedGroups),
+    hideBought: Boolean(value.hideBought),
+    manualItems: Array.isArray(value.manualItems)
+      ? value.manualItems.map(normalizeManualItem).filter(Boolean)
+      : []
+  }
+}
+
+function normalizeManualItem(item) {
+  if (!item || typeof item !== 'object') return null
+  const name = String(item.name || '').trim()
+  if (!name) return null
+  return {
+    id: String(item.id || `${Date.now()}-${Math.random()}`),
+    name,
+    quantity: String(item.quantity || '1'),
+    packages: '',
+    cost: Math.max(0, Number(item.cost) || 0)
+  }
+}
+
+function plainObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? { ...value } : {}
+}
+
+function toDbShoppingState(value) {
+  return normalizeShoppingState(value)
 }

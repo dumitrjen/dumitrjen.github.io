@@ -18,6 +18,7 @@ To enable shared online events:
 1. Create a Supabase project.
 2. Open the Supabase SQL editor.
 3. Run the contents of `supabase-schema.sql`.
+   - If you already created the tables earlier, run it again after updates; it also includes migrations such as `events.shopping_state`.
 4. Copy `.env.example` to `.env.local`.
 5. Fill in:
 
@@ -40,6 +41,16 @@ VITE_SUPABASE_ANON_KEY
 With Supabase configured, the app can:
 
 - create an online event;
-- save products, global grams, and ratings;
+- save products, global grams, ratings, and shopping-list state;
 - load an event from `?event=<uuid>`;
 - copy a shareable event link.
+
+## Offline / phone install
+
+The app includes a basic PWA setup:
+
+- installable metadata via `manifest.webmanifest`;
+- a service worker that caches the app shell and built assets;
+- local shopping state via browser storage.
+
+Offline use works after the app has loaded successfully once on that device. Online Supabase saves still require a network connection.

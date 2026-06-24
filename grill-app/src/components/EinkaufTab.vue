@@ -257,14 +257,20 @@ import { categoryLabel } from '../constants/products.js'
 import { i18n, normalizeProductUrl, pick, t } from '../i18n.js'
 
 const page = ref(1)
-const temporaryPackages = reactive({})
-const boughtItems = reactive({})
-const collapsedGroups = reactive({})
+const temporaryPackages = computed(() => store.shoppingState.temporaryPackages)
+const boughtItems = computed(() => store.shoppingState.boughtItems)
+const collapsedGroups = computed(() => store.shoppingState.collapsedGroups)
 const shoppingSearch = ref('')
 const shoppingSort = ref('name')
 const exportMessage = ref('')
-const hideBought = ref(false)
-const manualItems = ref([])
+const hideBought = computed({
+  get: () => store.shoppingState.hideBought,
+  set: value => { store.shoppingState.hideBought = value }
+})
+const manualItems = computed({
+  get: () => store.shoppingState.manualItems,
+  set: value => { store.shoppingState.manualItems = value }
+})
 const manualItem = reactive({
   name: '',
   quantity: '',
@@ -312,7 +318,7 @@ const calculatedTotal = computed(() =>
 )
 const temporaryTotal = computed(() =>
   temporaryItems.value.reduce((sum, item) =>
-    sum + Math.max(0, Number(temporaryPackages[item.name]) || 0) * item.price, 0)
+    sum + Math.max(0, Number(temporaryPackages.value[item.name]) || 0) * item.price, 0)
 )
 const manualTotal = computed(() =>
   manualItems.value.reduce((sum, item) => sum + Math.max(0, Number(item.cost) || 0), 0)
@@ -331,7 +337,7 @@ const finalShoppingItems = computed(() => {
   }))
   const temporary = temporaryItems.value
     .map(item => {
-      const packages = Math.max(0, Number(temporaryPackages[item.name]) || 0)
+      const packages = Math.max(0, Number(temporaryPackages.value[item.name]) || 0)
       return {
         key: `temp:${item.name}`,
         name: item.name,
@@ -356,7 +362,7 @@ const finalShoppingItems = computed(() => {
 })
 const visibleFinalShoppingGroups = computed(() => {
   const visible = hideBought.value
-    ? finalShoppingItems.value.filter(item => !boughtItems[item.key])
+    ? finalShoppingItems.value.filter(item => !boughtItems.value[item.key])
     : finalShoppingItems.value
   const groups = visible.reduce((map, item) => {
     if (!map[item.category]) map[item.category] = []
@@ -366,17 +372,17 @@ const visibleFinalShoppingGroups = computed(() => {
   return Object.entries(groups)
 })
 const boughtCount = computed(() =>
-  finalShoppingItems.value.filter(item => boughtItems[item.key]).length
+  finalShoppingItems.value.filter(item => boughtItems.value[item.key]).length
 )
 const selectedTemporaryCount = computed(() =>
-  temporaryItems.value.filter(item => Number(temporaryPackages[item.name]) > 0).length
+  temporaryItems.value.filter(item => Number(temporaryPackages.value[item.name]) > 0).length
 )
 const costPerPerson = computed(() =>
   store.ratings.length ? grandTotal.value / store.ratings.length : 0
 )
 const shoppingChecks = computed(() => {
   const checks = []
-  if (drinkStats.value.length && !drinkStats.value.some(item => Number(temporaryPackages[item.name]) > 0)) {
+  if (drinkStats.value.length && !drinkStats.value.some(item => Number(temporaryPackages.value[item.name]) > 0)) {
     checks.push(pick('0 Getränke-Packungen gesetzt', '0 drink packages set'))
   }
   const missingPrices = store.products.filter(product => !Number(product.price)).length
@@ -410,8 +416,8 @@ function filterBySearch(items) {
 function sortItems(items, type) {
   return [...items].sort((a, b) => {
     if (shoppingSort.value === 'cost') {
-      const aCost = type === 'main' ? a.kosten : (Number(temporaryPackages[a.name]) || 0) * a.price
-      const bCost = type === 'main' ? b.kosten : (Number(temporaryPackages[b.name]) || 0) * b.price
+      const aCost = type === 'main' ? a.kosten : (Number(temporaryPackages.value[a.name]) || 0) * a.price
+      const bCost = type === 'main' ? b.kosten : (Number(temporaryPackages.value[b.name]) || 0) * b.price
       return bCost - aCost || a.name.localeCompare(b.name)
     }
     if (shoppingSort.value === 'demand') {
@@ -450,12 +456,12 @@ function addManualShoppingItem() {
 
 function removeManualShoppingItem(id) {
   const item = manualItems.value.find(entry => entry.id === id)
-  if (item) delete boughtItems[`manual:${item.id}`]
+  if (item) delete boughtItems.value[`manual:${item.id}`]
   manualItems.value = manualItems.value.filter(entry => entry.id !== id)
 }
 
 function groupBoughtCount(items) {
-  return items.filter(item => boughtItems[item.key]).length
+  return items.filter(item => boughtItems.value[item.key]).length
 }
 
 function exportShoppingList() {
@@ -468,7 +474,7 @@ function exportShoppingList() {
       item.cost.toFixed(2),
       item.source,
       item.note,
-      boughtItems[item.key] ? 'ja' : 'nein'
+      boughtItems.value[item.key] ? 'ja' : 'nein'
     ])
   ]
   const csv = rows.map(row => row.map(csvCell).join(',')).join('\r\n')
@@ -518,7 +524,7 @@ function shoppingText() {
     lines.push(label)
     lines.push('-'.repeat(label.length))
     items.forEach(item => {
-      const checked = boughtItems[item.key] ? 'x' : ' '
+      const checked = boughtItems.value[item.key] ? 'x' : ' '
       lines.push(`[${checked}] ${item.quantity} ${item.name} - €${item.cost.toFixed(2)}`)
       if (item.note) lines.push(`    ${item.note}`)
       if (item.source) lines.push(`    ${item.source}`)

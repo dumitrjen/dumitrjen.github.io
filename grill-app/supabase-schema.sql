@@ -2,9 +2,13 @@ create table if not exists events (
   id uuid primary key default gen_random_uuid(),
   name text,
   global_grams integer not null default 0,
+  shopping_state jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table events
+  add column if not exists shopping_state jsonb not null default '{}'::jsonb;
 
 create table if not exists products (
   id uuid primary key default gen_random_uuid(),

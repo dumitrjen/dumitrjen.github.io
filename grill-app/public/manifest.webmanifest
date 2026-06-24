@@ -1,0 +1,34 @@
+{
+  "name": "GrillRechner",
+  "short_name": "GrillCalc",
+  "description": "Plan grill shopping, keep a phone-friendly list, and use it offline after loading once.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#171715",
+  "theme_color": "#1c1c1a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Einkauf öffnen",
+      "short_name": "Einkauf",
+      "description": "Open the shopping screen.",
+      "url": "/?tab=einkauf",
+      "icons": [
+        {
+          "src": "/pwa-icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
+  ]
+}
