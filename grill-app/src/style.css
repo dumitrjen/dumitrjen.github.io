@@ -1373,6 +1373,63 @@ button {
   font-size: 1.55rem;
 }
 
+.final-shopping-section {
+  margin-top: 18px;
+}
+
+.actual-shopping-list {
+  display: grid;
+  gap: 8px;
+}
+
+.actual-shopping-row {
+  display: grid;
+  grid-template-columns: 22px minmax(180px, 1fr) 130px 100px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: #fffdf8;
+}
+
+.actual-shopping-row input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--green);
+}
+
+.actual-shopping-row.bought {
+  opacity: 0.58;
+  background: #f0eee8;
+}
+
+.actual-shopping-row.bought .actual-shopping-copy strong {
+  text-decoration: line-through;
+}
+
+.actual-shopping-copy strong,
+.actual-shopping-copy small {
+  display: block;
+}
+
+.actual-shopping-copy small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.actual-shopping-qty {
+  font-weight: 900;
+}
+
+.actual-shopping-price {
+  color: var(--green);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-align: right;
+}
+
 .shopping-card {
   border-left: 4px solid var(--green);
 }
@@ -1692,6 +1749,16 @@ button {
     grid-template-columns: 1fr 100px;
   }
 
+  .actual-shopping-row {
+    grid-template-columns: 22px 1fr;
+  }
+
+  .actual-shopping-qty,
+  .actual-shopping-price {
+    grid-column: 2;
+    text-align: left;
+  }
+
   .drink-line-price {
     grid-column: 1 / -1;
     padding-top: 8px;
@@ -1711,6 +1778,50 @@ button {
   .editor-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media print {
+  body {
+    background: white;
+  }
+
+  .site-header,
+  .tab-bar,
+  .online-panel,
+  .result-page-nav,
+  .shopping-overview,
+  .shopping-checks,
+  .shopping-filter-bar,
+  .temporary-notice,
+  .section-heading-actions,
+  .grand-total,
+  .shopping-card,
+  .section-card:not(.final-shopping-section) {
+    display: none !important;
+  }
+
+  .app-shell,
+  .content-panel {
+    padding: 0;
+  }
+
+  .app-frame,
+  .final-shopping-section {
+    border: 0;
+    box-shadow: none;
+  }
+
+  .final-shopping-section {
+    display: block !important;
+    margin: 0;
+    padding: 0;
+    background: white;
+  }
+
+  .actual-shopping-row {
+    break-inside: avoid;
+    border-color: #999;
   }
 }
 

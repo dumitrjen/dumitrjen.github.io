@@ -60,7 +60,9 @@
           <strong>{{ store.onlineEventId ? store.onlineEventName || store.onlineEventId : pick('Lokale Session', 'Local session') }}</strong>
           <span v-if="store.supabaseConfigError" class="error">{{ pick('Falscher Supabase-Key: Bitte den anon public key verwenden, nicht den secret key.', 'Wrong Supabase key: use the anon public key, not the secret key.') }}</span>
           <span v-else-if="!store.supabaseConfigured">{{ pick('Supabase-Keys fehlen. Die App läuft lokal weiter.', 'Supabase keys are missing. The app keeps working locally.') }}</span>
+          <span v-else-if="store.onlineDirty">{{ pick('Ungespeicherte Änderungen · Autosave läuft.', 'Unsaved changes · autosave is active.') }}</span>
           <span v-else-if="store.onlineMessage" :class="{ error: store.onlineStatus === 'error' }">{{ store.onlineMessage }}</span>
+          <span v-else-if="store.lastSavedAt">{{ pick(`Zuletzt gespeichert: ${new Date(store.lastSavedAt).toLocaleTimeString('de-AT')}`, `Last saved: ${new Date(store.lastSavedAt).toLocaleTimeString('en-US')}`) }}</span>
           <span v-else>{{ pick('Erstelle ein Online-Event oder lade eins per Link.', 'Create an online event or load one by link.') }}</span>
         </div>
         <div class="online-actions">

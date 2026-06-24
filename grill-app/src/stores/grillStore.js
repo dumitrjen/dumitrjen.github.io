@@ -13,6 +13,8 @@ const savedProducts = JSON.parse(storage?.getItem('grill_products') || '[]')
     }
   })
 
+let autosaveTimer = null
+
 export const store = reactive({
   products: savedProducts,
   ratings: JSON.parse(storage?.getItem('grill_ratings') || '[]'),
@@ -22,6 +24,10 @@ export const store = reactive({
   onlineStatus: supabaseConfigured ? 'ready' : 'not_configured',
   onlineMessage: '',
   onlineBusy: false,
+  onlineDirty: false,
+  onlineAutosave: true,
+  loadingOnline: false,
+  lastSavedAt: storage?.getItem('grill_lastSavedAt') || '',
   supabaseConfigured,
   supabaseConfigError,
 
@@ -88,6 +94,8 @@ export const store = reactive({
       this.onlineEventId = data.id
       this.onlineEventName = data.name || name
       await this.replaceOnlineData()
+      this.onlineDirty = false
+      this.lastSavedAt = new Date().toISOString()
       this.setEventUrl(data.id)
       this.setOnlineSuccess('Online-Event erstellt.')
     } catch (error) {
@@ -97,11 +105,11 @@ export const store = reactive({
     }
   },
 
-  async saveOnlineEvent() {
+  async saveOnlineEvent(silent = false) {
     if (!supabase) return this.setOnlineError('Supabase ist noch nicht konfiguriert.')
     if (!this.onlineEventId) return this.setOnlineError('Noch kein Online-Event aktiv.')
     this.onlineBusy = true
-    this.onlineMessage = ''
+    if (!silent) this.onlineMessage = ''
     try {
       const { error } = await supabase
         .from('events')
@@ -113,7 +121,9 @@ export const store = reactive({
         .eq('id', this.onlineEventId)
       if (error) throw error
       await this.replaceOnlineData()
-      this.setOnlineSuccess('Online gespeichert.')
+      this.onlineDirty = false
+      this.lastSavedAt = new Date().toISOString()
+      this.setOnlineSuccess(silent ? 'Automatisch gespeichert.' : 'Online gespeichert.')
     } catch (error) {
       this.setOnlineError(error.message)
     } finally {
@@ -140,16 +150,19 @@ export const store = reactive({
       if (productsError) throw productsError
       if (ratingsError) throw ratingsError
 
+      this.loadingOnline = true
       this.onlineEventId = event.id
       this.onlineEventName = event.name || ''
       this.globalGrams = Number(event.global_grams) || 0
       this.products = (products || []).map(fromDbProduct)
       this.ratings = (ratings || []).map(fromDbRating)
+      this.onlineDirty = false
       this.setEventUrl(event.id)
       this.setOnlineSuccess('Online-Event geladen.')
     } catch (error) {
       this.setOnlineError(error.message)
     } finally {
+      this.loadingOnline = false
       this.onlineBusy = false
     }
   },
@@ -179,6 +192,16 @@ export const store = reactive({
     this.setOnlineSuccess('Link kopiert.')
   },
 
+  markOnlineDirty() {
+    if (this.loadingOnline || !this.onlineEventId || !this.supabaseConfigured) return
+    this.onlineDirty = true
+    if (!this.onlineAutosave) return
+    clearTimeout(autosaveTimer)
+    autosaveTimer = setTimeout(() => {
+      this.saveOnlineEvent(true)
+    }, 1600)
+  },
+
   eventLink() {
     const url = new URL(window.location.href)
     url.searchParams.set('event', this.onlineEventId)
@@ -203,10 +226,15 @@ export const store = reactive({
 })
 
 watch(() => store.products, v => storage?.setItem('grill_products', JSON.stringify(v)), { deep: true })
+watch(() => store.products, () => store.markOnlineDirty(), { deep: true })
 watch(() => store.ratings, v => storage?.setItem('grill_ratings', JSON.stringify(v)), { deep: true })
+watch(() => store.ratings, () => store.markOnlineDirty(), { deep: true })
 watch(() => store.globalGrams, v => storage?.setItem('grill_globalGrams', JSON.stringify(v)))
+watch(() => store.globalGrams, () => store.markOnlineDirty())
 watch(() => store.onlineEventId, v => storage?.setItem('grill_onlineEventId', v || ''))
 watch(() => store.onlineEventName, v => storage?.setItem('grill_onlineEventName', v || ''))
+watch(() => store.onlineEventName, () => store.markOnlineDirty())
+watch(() => store.lastSavedAt, v => storage?.setItem('grill_lastSavedAt', v || ''))
 
 export function ratingIsInterested(value) {
   return Number(value) > 1

@@ -145,6 +145,53 @@
           <div class="price">€{{ grandTotal.toFixed(2) }}</div>
         </div>
       </div>
+
+      <div class="section-card final-shopping-section">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">{{ pick('Finale Liste', 'Final list') }}</p>
+            <h2>{{ pick('Echte Einkaufsliste', 'Actual shopping list') }}</h2>
+          </div>
+          <div class="section-heading-actions">
+            <button @click="copyShoppingText" class="button button-quiet" :disabled="!finalShoppingItems.length">
+              {{ pick('Text kopieren', 'Copy text') }}
+            </button>
+            <button @click="shareShoppingText" class="button button-quiet" :disabled="!finalShoppingItems.length">
+              {{ pick('Teilen', 'Share') }}
+            </button>
+            <button @click="exportShoppingText" class="button button-quiet" :disabled="!finalShoppingItems.length">
+              TXT
+            </button>
+            <button @click="exportShoppingList" class="button button-quiet" :disabled="!finalShoppingItems.length">
+              {{ pick('CSV exportieren', 'Export CSV') }}
+            </button>
+            <button @click="printShoppingList" class="button button-quiet" :disabled="!finalShoppingItems.length">
+              {{ pick('Drucken', 'Print') }}
+            </button>
+          </div>
+        </div>
+
+        <div v-if="!finalShoppingItems.length" class="empty-state">
+          {{ pick('Noch keine Produkte mit Einkaufsmenge.', 'No products with shopping quantities yet.') }}
+        </div>
+        <p v-if="exportMessage" class="feedback success">{{ exportMessage }}</p>
+        <div v-if="finalShoppingItems.length" class="actual-shopping-list">
+          <label
+            v-for="item in finalShoppingItems"
+            :key="item.key"
+            class="actual-shopping-row"
+            :class="{ bought: boughtItems[item.key] }"
+          >
+            <input v-model="boughtItems[item.key]" type="checkbox">
+            <span class="actual-shopping-copy">
+              <strong>{{ item.name }}</strong>
+              <small>{{ categoryLabel(item.category, i18n.language) }} · {{ item.note }}</small>
+            </span>
+            <span class="actual-shopping-qty">{{ item.quantity }}</span>
+            <span class="actual-shopping-price">€{{ item.cost.toFixed(2) }}</span>
+          </label>
+        </div>
+      </div>
     </template>
   </div>
 </template>
@@ -157,8 +204,10 @@ import { i18n, normalizeProductUrl, pick, t } from '../i18n.js'
 
 const page = ref(1)
 const temporaryPackages = reactive({})
+const boughtItems = reactive({})
 const shoppingSearch = ref('')
 const shoppingSort = ref('name')
+const exportMessage = ref('')
 
 const calculatedProducts = computed(() => {
   const map = {}
@@ -204,6 +253,34 @@ const temporaryTotal = computed(() =>
     sum + Math.max(0, Number(temporaryPackages[item.name]) || 0) * item.price, 0)
 )
 const grandTotal = computed(() => calculatedTotal.value + temporaryTotal.value)
+const finalShoppingItems = computed(() => {
+  const calculated = calculatedProducts.value.map(product => ({
+    key: `calc:${product.name}`,
+    name: product.name,
+    category: product.cat,
+    quantity: `${product.packungen} ${t('packages')}`,
+    packages: product.packungen,
+    cost: product.kosten,
+    note: pick(`${product.gramm} g benötigt`, `${product.gramm} g required`),
+    source: pick('berechnet', 'calculated')
+  }))
+  const temporary = temporaryItems.value
+    .map(item => {
+      const packages = Math.max(0, Number(temporaryPackages[item.name]) || 0)
+      return {
+        key: `temp:${item.name}`,
+        name: item.name,
+        category: item.cat,
+        quantity: `${packages} ${t('packages')}`,
+        packages,
+        cost: packages * item.price,
+        note: pick(`${item.interested}/${store.ratings.length} interessiert`, `${item.interested}/${store.ratings.length} interested`),
+        source: pick('temporär', 'temporary')
+      }
+    })
+    .filter(item => item.packages > 0)
+  return [...calculated, ...temporary]
+})
 const selectedTemporaryCount = computed(() =>
   temporaryItems.value.filter(item => Number(temporaryPackages[item.name]) > 0).length
 )
@@ -267,6 +344,117 @@ function productStatus(product) {
   if (!product.price) return pick('Preis fehlt', 'Missing price')
   if (!product.link) return pick('Link fehlt', 'Missing link')
   return pick('Berechnet', 'Calculated')
+}
+
+function exportShoppingList() {
+  const rows = [
+    ['Name', 'Kategorie', 'Packungen', 'Kosten', 'Quelle', 'Notiz', 'Gekauft'],
+    ...finalShoppingItems.value.map(item => [
+      item.name,
+      item.category,
+      item.packages,
+      item.cost.toFixed(2),
+      item.source,
+      item.note,
+      boughtItems[item.key] ? 'ja' : 'nein'
+    ])
+  ]
+  const csv = rows.map(row => row.map(csvCell).join(',')).join('\r\n')
+  downloadText(`\uFEFF${csv}`, 'grill-einkaufsliste.csv', 'text/csv;charset=utf-8')
+}
+
+async function copyShoppingText() {
+  await copyText(shoppingText())
+  exportMessage.value = pick('Einkaufsliste als Text kopiert.', 'Shopping list copied as text.')
+}
+
+async function shareShoppingText() {
+  const text = shoppingText()
+  const title = pick('Grill-Einkaufsliste', 'Grill shopping list')
+  if (navigator.share) {
+    await navigator.share({ title, text })
+    exportMessage.value = pick('Einkaufsliste geteilt.', 'Shopping list shared.')
+    return
+  }
+  await copyText(text)
+  exportMessage.value = pick(
+    'Teilen wird hier nicht unterstützt; Text wurde kopiert.',
+    'Sharing is not supported here; text was copied.'
+  )
+}
+
+function exportShoppingText() {
+  downloadText(shoppingText(), 'grill-einkaufsliste.txt', 'text/plain;charset=utf-8')
+}
+
+function printShoppingList() {
+  window.print()
+}
+
+function shoppingText() {
+  const title = pick('Grill-Einkaufsliste', 'Grill shopping list')
+  const lines = [
+    title,
+    '='.repeat(title.length),
+    pick(`Gesamtkosten: €${grandTotal.value.toFixed(2)}`, `Total cost: €${grandTotal.value.toFixed(2)}`),
+    pick(`Personen: ${store.ratings.length}`, `People: ${store.ratings.length}`),
+    ''
+  ]
+
+  groupedShoppingItems().forEach(([category, items]) => {
+    const label = categoryLabel(category, i18n.language)
+    lines.push(label)
+    lines.push('-'.repeat(label.length))
+    items.forEach(item => {
+      const checked = boughtItems[item.key] ? 'x' : ' '
+      lines.push(`[${checked}] ${item.quantity} ${item.name} - €${item.cost.toFixed(2)}`)
+      if (item.note) lines.push(`    ${item.note}`)
+      if (item.source) lines.push(`    ${item.source}`)
+    })
+    lines.push('')
+  })
+
+  return `${lines.join('\n').trim()}\n`
+}
+
+function groupedShoppingItems() {
+  const groups = finalShoppingItems.value.reduce((map, item) => {
+    if (!map[item.category]) map[item.category] = []
+    map[item.category].push(item)
+    return map
+  }, {})
+  return Object.entries(groups)
+}
+
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text)
+    return
+  }
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.select()
+  document.execCommand('copy')
+  document.body.removeChild(textarea)
+}
+
+function csvCell(value) {
+  const text = String(value ?? '')
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+}
+
+function downloadText(text, filename, type) {
+  const blob = new Blob([text], { type })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 const QuantityRow = defineComponent({
